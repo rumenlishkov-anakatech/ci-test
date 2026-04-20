@@ -1,4 +1,4 @@
-name: Trigger CircleCI Pipeline
+name: Trigger & Wait for CircleCI
 
 on:
   push:
@@ -8,20 +8,68 @@ on:
 jobs:
   trigger-circleci:
     if: contains(github.event.head_commit.message, 'Merge')
-    
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger CircleCI pipeline via API
+      - name: Trigger CircleCI pipeline
+        id: trigger
         run: |
-          curl -X POST "https://circleci.com/api/v2/project/github/netomedia/ng-game/pipeline" \
+          RESPONSE=$(curl -s -X POST "https://circleci.com/api/v2/project/github/netomedia/ng-game/pipeline" \
             -H "Circle-Token: ${CIRCLECI_TOKEN}" \
             -H "Content-Type: application/json" \
             -d '{
-                  "branch": "develop",
-                  "parameters": {
-                    "triggered_by": "github-actions"
-                  }
-                }'
+                  "branch": "develop"
+                }')
+
+          echo "Response: $RESPONSE"
+
+          PIPELINE_ID=$(echo $RESPONSE | jq -r '.id')
+          echo "pipeline_id=$PIPELINE_ID" >> $GITHUB_OUTPUT
+        env:
+          CIRCLECI_TOKEN: ${{ secrets.CIRCLECI_TOKEN }}
+          CIRCLECI_PROJECT_SLUG: ${{ secrets.CIRCLECI_PROJECT_SLUG }}
+
+      - name: Wait for workflow to finish
+        run: |
+          PIPELINE_ID=${{ steps.trigger.outputs.pipeline_id }}
+
+          echo "Waiting for workflow for pipeline: $PIPELINE_ID"
+
+          # чакаме workflow да се появи
+          while true; do
+            WORKFLOW_RESPONSE=$(curl -s -H "Circle-Token: ${CIRCLECI_TOKEN}" \
+              "https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow")
+
+            WORKFLOW_ID=$(echo $WORKFLOW_RESPONSE | jq -r '.items[0].id')
+
+            if [ "$WORKFLOW_ID" != "null" ]; then
+              break
+            fi
+
+            echo "Waiting for workflow to start..."
+            sleep 5
+          done
+
+          echo "Workflow ID: $WORKFLOW_ID"
+
+          # чакаме workflow да приключи
+          while true; do
+            STATUS_RESPONSE=$(curl -s -H "Circle-Token: ${CIRCLECI_TOKEN}" \
+              "https://circleci.com/api/v2/workflow/$WORKFLOW_ID")
+
+            STATUS=$(echo $STATUS_RESPONSE | jq -r '.status')
+
+            echo "Current status: $STATUS"
+
+            if [ "$STATUS" == "success" ]; then
+              echo "CircleCI build passed ✅"
+              exit 0
+            elif [ "$STATUS" == "failed" ] || [ "$STATUS" == "canceled" ]; then
+              echo "CircleCI build failed ❌"
+              exit 1
+            fi
+
+            sleep 10
+          done
         env:
           CIRCLECI_TOKEN: ${{ secrets.CIRCLECI_TOKEN }}
