@@ -1,0 +1,27 @@
+name: Trigger CircleCI Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  trigger-circleci:
+    if: contains(github.event.head_commit.message, 'Merge')
+    
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger CircleCI pipeline via API
+        run: |
+          curl -X POST "https://circleci.com/api/v2/project/github/netomedia/ng-game/pipeline" \
+            -H "Circle-Token: ${CIRCLECI_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{
+                  "branch": "develop",
+                  "parameters": {
+                    "triggered_by": "github-actions"
+                  }
+                }'
+        env:
+          CIRCLECI_TOKEN: ${{ secrets.CIRCLECI_TOKEN }}
