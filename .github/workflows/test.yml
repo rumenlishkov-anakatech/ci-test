@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - develop
+      - staging
+      - prod
 
 jobs:
   trigger-circleci:
+    name: Trigger CircleCI Pipeline
     if: contains(github.event.head_commit.message, 'Merge')
     runs-on: ubuntu-latest
 
@@ -66,7 +69,7 @@ jobs:
               exit 1
             fi
 
-            sleep 10
+            sleep 30
           done
         env:
           CIRCLECI_TOKEN: ${{ secrets.CIRCLECI_TOKEN }}
@@ -88,4 +91,4 @@ jobs:
           CRUMB_HEADER_NAME=$(echo "$CRUMB_DATA" | jq -r '.crumbRequestField')
 
           echo "Triggering Jenkins job..."
-          curl -X POST -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" -H "${CRUMB_HEADER_NAME}:${CRUMB}" "${JENKINS_URL}${JENKINS_JOB_PATH}/build"
+          curl -X POST -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" -H "${CRUMB_HEADER_NAME}:${CRUMB}" "${JENKINS_URL}${JENKINS_JOB_PATH}/buildWithParameters?BRANCH_NAME=${GITHUB_REF_NAME}"
