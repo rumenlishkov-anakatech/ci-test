@@ -21,13 +21,15 @@ jobs:
             -H "Circle-Token: ${CIRCLECI_TOKEN}" \
             -H "Content-Type: application/json" \
             -d '{
-                  "branch": "develop"
+                  "branch": "'"$GITHUB_REF_NAME"'"
                 }')
 
           echo "Response: $RESPONSE"
 
           PIPELINE_ID=$(echo $RESPONSE | jq -r '.id')
+          PIPELINE_NUMBER=$(echo $RESPONSE | jq -r '.number')
           echo "pipeline_id=$PIPELINE_ID" >> $GITHUB_OUTPUT
+          echo "pipeline_number=$PIPELINE_NUMBER" >> $GITHUB_OUTPUT
         env:
           CIRCLECI_TOKEN: ${{ secrets.CIRCLECI_TOKEN }}
 
@@ -91,4 +93,5 @@ jobs:
           CRUMB_HEADER_NAME=$(echo "$CRUMB_DATA" | jq -r '.crumbRequestField')
 
           echo "Triggering Jenkins job..."
-          curl -X POST -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" -H "${CRUMB_HEADER_NAME}:${CRUMB}" "${JENKINS_URL}${JENKINS_JOB_PATH}/buildWithParameters?BRANCH_NAME=${GITHUB_REF_NAME}"
+          NEW_BRANCH_NAME="${GITHUB_REF_NAME}-${{needs.trigger-circleci.outputs.pipeline_number}}"
+          curl -X POST -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" -H "${CRUMB_HEADER_NAME}:${CRUMB}" "${JENKINS_URL}${JENKINS_JOB_PATH}/buildWithParameters?BRANCH_NAME=${NEW_BRANCH_NAME}"
