@@ -12,6 +12,9 @@ jobs:
     name: Trigger CircleCI Pipeline
     if: contains(github.event.head_commit.message, 'Merge')
     runs-on: ubuntu-latest
+    outputs:
+      pipeline_id: ${{ steps.trigger.outputs.pipeline_id }}
+      pipeline_number: ${{ steps.trigger.outputs.pipeline_number }}
 
     steps:
       - name: Trigger CircleCI pipeline
